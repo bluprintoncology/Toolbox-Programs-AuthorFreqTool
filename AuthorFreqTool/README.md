@@ -1,2 +1,2 @@
 # Author Frequency Tool
-## Update Python code for Streamlit App deployment
+## Updated Python code for Streamlit App deployment
