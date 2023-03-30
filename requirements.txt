@@ -21,7 +21,6 @@ markdown-it-py==2.2.0
 markupsafe==2.1.2
 matplotlib==3.7.1
 mdurl==0.1.2
-ncurses==6.4 
 numpy==1.24.2
 openssl==1.1.1t
 packaging==23.0
