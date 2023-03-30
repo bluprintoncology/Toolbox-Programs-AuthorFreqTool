@@ -22,7 +22,7 @@ markupsafe==2.1.2
 matplotlib==3.7.1
 mdurl==0.1.2
 numpy==1.24.2
-openssl==1.1.1t
+openssl==1.1.1
 packaging==23.0
 pandas==1.5.3
 pillow==9.4.0
