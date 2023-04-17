@@ -4,11 +4,11 @@ import streamlit as st
 from io import StringIO
 from pandas import DataFrame
 import pandas as pd
+from unidecode import unidecode
 
 #NEED TO REPLACE ; or . with , in excel using find replace
 
 #Function to convert dataframe to csv
-
 def convert_df(df):
     return df.to_csv().encode('utf-8')
 
@@ -23,13 +23,14 @@ uploaded_file = st.file_uploader("Choose a .csv file", type = [".csv"])
 if uploaded_file is not None:
      # Creates dataframe with "file-like" object as input
      df = pd.read_csv(uploaded_file)
+     df = df["AUTHOR"].apply(unidecode) #removes accents from input
      # Checkbox to allow user to show/hide preview of input dataframe
      st.subheader("Review Input data (Optional)") 
      if st.checkbox('Show input data'):
         st.subheader('Input data')
         st.write(df)
      #st.write(df) # Creates preview by default
-     content = list(df["AUTHORS"])
+     content = list(df)
      separator = " "
      content = separator.join(content)
      L = content.split("," or ".")
@@ -53,6 +54,3 @@ if uploaded_file is not None:
      file_name='AuthorCount.csv',
      mime='text/csv',
  )
-
-
-
