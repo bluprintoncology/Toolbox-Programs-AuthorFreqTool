@@ -27,7 +27,7 @@ st.markdown("""
 6. Download your Author List!
 """)
 
-
+##-------Upload Files-------
 # File Uploader Widget with specified .csv file type or returns error statement
 st.subheader("Select a CSV file")
 uploaded_file = st.file_uploader("Choose a .csv file", type = [".csv"])
@@ -36,7 +36,8 @@ uploaded_file = st.file_uploader("Choose a .csv file", type = [".csv"])
 if uploaded_file is not None:
      # Creates dataframe with "file-like" object as input
      df = pd.read_csv(uploaded_file)
-     df = df["AUTHOR"].apply(unidecode) #removes accents from input
+     df["AUTHOR"].replace(regex=True, inplace=True, to_replace=r'\|\|', value=r', ') #find and replace '||' with ',[space]' 
+     df = df["AUTHOR"].apply(unidecode)#removes accents from input
      # Checkbox to allow user to show/hide preview of input dataframe
      st.subheader("Review Input data (Optional)") 
      if st.checkbox('Show input data'):
