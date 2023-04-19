@@ -6,14 +6,27 @@ from pandas import DataFrame
 import pandas as pd
 from unidecode import unidecode
 
-#NEED TO REPLACE ; or . with , in excel using find replace
-
-#Function to convert dataframe to csv
+##-------Funtions to be excuted in the application-------
+#Convert dataframe to csv for export
 def convert_df(df):
     return df.to_csv().encode('utf-8')
 
+##-------App Title-------
 # Add Title for Streamlit App
-st.title('AuthorsFrequencyTool')
+st.title('Author Count Tool')
+
+##-------Work Instructions Tool Overview and Process Steps-------
+st.markdown("The author count tool provides an author list with frequency of that author for a particular topic. The topic is selected in collecting the data (eg, pubmed search). The tool will replace special characters automatically. Follow these instructions to create your author list.")
+st.markdown("""
+1. Download data from a PubMed search in **CSV** format (Ensure your search is specific enough to achieve the desired list – ie consider using only clinical trial publications to identify clinician scientists)
+2. Prepare your excel spreadsheet by labeling the first cell of the columns which includes your author data as AUTHOR (**ensure all caps**)
+    - If using PubMed2XL data for the author list, be sure to Find/Replace “||” with “, “ before saving (**ensure space is included in replace**)
+3. Save your file as a CSV
+4. Pubmed CSV files will have author last name and first initial – if you would like to get the full author names, use PubMed2xl to collect detailed information and use that as your source data
+5. Examine results before downloading to confirm
+6. Download your Author List!
+""")
+
 
 # File Uploader Widget with specified .csv file type or returns error statement
 st.subheader("Select a CSV file")
@@ -54,3 +67,6 @@ if uploaded_file is not None:
      file_name='AuthorCount.csv',
      mime='text/csv',
  )
+
+
+
