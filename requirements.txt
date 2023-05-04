@@ -13,3 +13,7 @@ validators==0.20.0
 wheel==0.38.4
 wordcloud==1.8.2.2
 unidecode
+beautifulsoup4
+elementpath
+requests
+urllib3
