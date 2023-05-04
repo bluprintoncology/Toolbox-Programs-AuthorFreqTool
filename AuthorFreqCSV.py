@@ -5,6 +5,12 @@ from io import StringIO
 from pandas import DataFrame
 import pandas as pd
 from unidecode import unidecode
+#Added for webscraping
+import xml.etree.ElementTree as ET
+from urllib.request import urlopen
+import requests
+from bs4 import BeautifulSoup
+import streamlit_ext as ste
 
 ##-------Funtions to be excuted in the application-------
 #Convert dataframe to csv for export
@@ -36,14 +42,26 @@ uploaded_file = st.file_uploader("Choose a .csv file", type = [".csv"])
 if uploaded_file is not None:
      # Creates dataframe with "file-like" object as input
      df = pd.read_csv(uploaded_file)
+     #add list readout for PMID
+     pmidlist=df['PMID'].to_list()
      df["AUTHOR"].replace(regex=True, inplace=True, to_replace=r'\|\|', value=r', ') #find and replace '||' with ',[space]' 
      df = df["AUTHOR"].apply(unidecode)#removes accents from input
      # Checkbox to allow user to show/hide preview of input dataframe
-     st.subheader("Review Input data (Optional)") 
-     if st.checkbox('Show input data'):
-        st.subheader('Input data')
-        st.write(df)
-     #st.write(df) # Creates preview by default
+     st.subheader("Review Input data (Optional)")
+     preview = st.checkbox('Show input data')
+     preview_placeholder = st.empty()
+
+     if preview:
+        with preview_placeholder.container():
+            st.subheader('Input data')
+            st.write(df) #main df full input data
+            st.stop() #Box checked: stops run
+     else:
+        preview_placeholder.empty() #Box unchecked: continues to run and no dataframe shown
+
+     placeholder=st.empty()
+     placeholder.text("Generating Author Count and DOI List. Please wait...")
+
      content = list(df)
      separator = " "
      content = separator.join(content)
@@ -53,7 +71,56 @@ if uploaded_file is not None:
      autdict = dict(authorfreq)
      #st.write(autdict) # Creates preview by default
      df = pd.DataFrame.from_dict(autdict, orient="index")
+    ##----------------Start of Webcrawl for DOI table------------------------##
+    #Lists with all authors in entire input document
+     auth_name_set=[]
+     doi_url=[]
+     pmid_df_list=[]
+     for item in pmidlist:
+        #PubmedParserforAuthorInfo
+        efetch = "http://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?&db=pubmed&retmode=xml&id=%s" % (item)
+        handle = urlopen(efetch)
+        data = handle.read()
+        root = ET.fromstring(data)
+        #bs4Parser for doi
+        doi_article  = requests.get(efetch)
+        soup = BeautifulSoup(doi_article.content,'xml')
+        doi = soup.find("ELocationID") 
+        if doi is not None:   
+            doi_text = doi.text
+        ##Scrape DOI to list format for each PMID
+            doi_url.append("https://doi.org/"+doi_text)
+        else:
+            doi_url.append('')
+        #PMID float to string for list
+        pmid_df_list.append(str(item))
+        #Lists with each PMID author set, to be appended to main list as sublist
+        forename_set_PMID = []
+        lastset_PMID = []
+        auth_name_set_PMID=[]
+        for article in root.findall("PubmedArticle"):
+            forename = article.findall("MedlineCitation/Article/AuthorList/Author/ForeName")
+            lastname = article.findall("MedlineCitation/Article/AuthorList/Author/LastName")
+            for i in forename:
+                forename_set_PMID.append(i.text)
+            for l in lastname:
+                lastset_PMID.append(l.text)
+            for ln,init in zip(lastset_PMID,forename_set_PMID):
+                auth_name_set_PMID.append(ln+' '+init)
+        auth_name_set.append(auth_name_set_PMID)
+     #List of all PMID Authors in auth_name_set=[]
+     #Get 1st and last author names in separate lists
+     first_auth =[]
+     last_auth =[]
+     for auth_items in auth_name_set:
+         first_auth.append(auth_items[0])
+         last_auth.append(auth_items[-1])
+    ##List for PMID, FirstAuth, LastAuth, Authors, DOI
+    ##Convert to df w/list and zip
+     pubinfo_doi_df = pd.DataFrame(list(zip(pmid_df_list,first_auth,last_auth,auth_name_set,doi_url)),columns=['PMID','FirstAuthor (Lastname,Forename)','LastAuthor (Lastname,Forename)','Authors (Lastname,Forename)','DOI_link'])
+    ##-----------------------------------------------------------------------##
     # Checkbox to allow user to show/hide preview of Author Count
+     placeholder.empty()
      st.subheader("Preview Author Count (Optional)") 
      if st.checkbox('Preview Author Count data'):
         st.subheader('Author Count data')
@@ -62,12 +129,16 @@ if uploaded_file is not None:
      csv = convert_df(df)
      # File Download Widget for AuthorCount.csv to Downloads folder
      st.subheader("Download Author Count File") 
-     st.download_button(
+     ste.download_button(
      label="Download AuthorCount.csv",
      data=csv,
      file_name='AuthorCount.csv',
-     mime='text/csv',
- )
-
-
-
+     mime='text/csv')
+    # File Download Widget for PMID_DOI.csv to Downloads folder
+     st.subheader("Download Author Information and Link File") 
+     csv_doi = convert_df(pubinfo_doi_df)
+     ste.download_button(
+     label="Download AuthorInfoandLink.csv",
+     data=csv_doi,
+     file_name='AuthorInfoandLink.csv',
+     mime='text/csv')
