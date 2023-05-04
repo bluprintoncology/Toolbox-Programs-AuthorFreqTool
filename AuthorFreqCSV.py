@@ -84,7 +84,7 @@ if uploaded_file is not None:
         root = ET.fromstring(data)
         #bs4Parser for doi
         doi_article  = requests.get(efetch)
-        soup = BeautifulSoup(doi_article.content,'xml')
+        soup = BeautifulSoup(doi_article.content,features="xml")
         doi = soup.find("ELocationID") 
         if doi is not None:   
             doi_text = doi.text
