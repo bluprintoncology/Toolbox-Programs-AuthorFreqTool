@@ -17,3 +17,5 @@ beautifulsoup4
 elementpath
 urllib3
 bs4
+lxml
+requests
