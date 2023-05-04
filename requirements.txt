@@ -15,6 +15,5 @@ wordcloud==1.8.2.2
 unidecode
 beautifulsoup4
 elementpath
-requests
 urllib3
 bs4
