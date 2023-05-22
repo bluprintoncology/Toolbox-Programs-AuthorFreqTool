@@ -11,134 +11,200 @@ from urllib.request import urlopen
 import requests
 from bs4 import BeautifulSoup
 import streamlit_ext as ste
+import itertools
+import re
 
-##-------Funtions to be excuted in the application-------
+##----------------Funtions to be excuted in the application----------------##
 #Convert dataframe to csv for export
 def convert_df(df):
     return df.to_csv().encode('utf-8')
 
-##-------App Title-------
-# Add Title for Streamlit App
-st.title('Author Count Tool')
+#One Global Password for all users function
+def check_password():
+    """Returns `True` if the user had the correct password."""
 
-##-------Work Instructions Tool Overview and Process Steps-------
-st.markdown("The author count tool provides an author list with frequency of that author for a particular topic. The topic is selected in collecting the data (eg, pubmed search). The tool will replace special characters automatically. Follow these instructions to create your author list.")
-st.markdown("""
-1. Download data from a PubMed search in **CSV** format (Ensure your search is specific enough to achieve the desired list – ie consider using only clinical trial publications to identify clinician scientists)
-2. Prepare your excel spreadsheet by labeling the first cell of the columns which includes your author data as AUTHOR (**ensure all caps**)
-    - If using PubMed2XL data for the author list, be sure to Find/Replace “||” with “, “ before saving (**ensure space is included in replace**)
-3. Save your file as a CSV
-4. Pubmed CSV files will have author last name and first initial – if you would like to get the full author names, use PubMed2xl to collect detailed information and use that as your source data
-5. Examine results before downloading to confirm
-6. Download your Author List!
-""")
-
-##-------Upload Files-------
-# File Uploader Widget with specified .csv file type or returns error statement
-st.subheader("Select a CSV file")
-uploaded_file = st.file_uploader("Choose a .csv file", type = [".csv"])
-
-# Checks to ensure a file is uploaded, then runs AuthorFreq application
-if uploaded_file is not None:
-     # Creates dataframe with "file-like" object as input
-     df = pd.read_csv(uploaded_file)
-     #add list readout for PMID
-     pmidlist=df['PMID'].to_list()
-     df["AUTHOR"].replace(regex=True, inplace=True, to_replace=r'\|\|', value=r', ') #find and replace '||' with ',[space]' 
-     df = df["AUTHOR"].apply(unidecode)#removes accents from input
-     # Checkbox to allow user to show/hide preview of input dataframe
-     st.subheader("Review Input data (Optional)")
-     preview = st.checkbox('Show input data')
-     preview_placeholder = st.empty()
-
-     if preview:
-        with preview_placeholder.container():
-            st.subheader('Input data')
-            st.write(df) #main df full input data
-            st.stop() #Box checked: stops run
-     else:
-        preview_placeholder.empty() #Box unchecked: continues to run and no dataframe shown
-
-     placeholder=st.empty()
-     placeholder.text("Generating Author Count and DOI List. Please wait...")
-
-     content = list(df)
-     separator = " "
-     content = separator.join(content)
-     L = content.split("," or ".")
-     #st.write(L) # Creates preview by default
-     authorfreq = pd.Series(L).value_counts()
-     autdict = dict(authorfreq)
-     #st.write(autdict) # Creates preview by default
-     df = pd.DataFrame.from_dict(autdict, orient="index")
-    ##----------------Start of Webcrawl for DOI table------------------------##
-    #Lists with all authors in entire input document
-     auth_name_set=[]
-     doi_url=[]
-     pmid_df_list=[]
-     for item in pmidlist:
-        #PubmedParserforAuthorInfo
-        efetch = "http://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?&db=pubmed&retmode=xml&id=%s" % (item)
-        handle = urlopen(efetch)
-        data = handle.read()
-        root = ET.fromstring(data)
-        #bs4Parser for doi
-        doi_article  = requests.get(efetch)
-        soup = BeautifulSoup(doi_article.content,features="xml")
-        doi = soup.find("ELocationID") 
-        if doi is not None:   
-            doi_text = doi.text
-        ##Scrape DOI to list format for each PMID
-            doi_url.append("https://doi.org/"+doi_text)
+    def password_entered():
+        """Checks whether a password entered by the user is correct."""
+        if st.session_state["password"] == st.secrets["password"]:
+            st.session_state["password_correct"] = True
+            del st.session_state["password"]  # don't store password
         else:
-            doi_url.append('')
-        #PMID float to string for list
-        pmid_df_list.append(str(item))
-        #Lists with each PMID author set, to be appended to main list as sublist
-        forename_set_PMID = []
-        lastset_PMID = []
-        auth_name_set_PMID=[]
-        for article in root.findall("PubmedArticle"):
-            forename = article.findall("MedlineCitation/Article/AuthorList/Author/ForeName")
-            lastname = article.findall("MedlineCitation/Article/AuthorList/Author/LastName")
-            for i in forename:
-                forename_set_PMID.append(i.text)
-            for l in lastname:
-                lastset_PMID.append(l.text)
-            for ln,init in zip(lastset_PMID,forename_set_PMID):
-                auth_name_set_PMID.append(ln+' '+init)
-        auth_name_set.append(auth_name_set_PMID)
-     #List of all PMID Authors in auth_name_set=[]
-     #Get 1st and last author names in separate lists
-     first_auth =[]
-     last_auth =[]
-     for auth_items in auth_name_set:
-         first_auth.append(auth_items[0])
-         last_auth.append(auth_items[-1])
-    ##List for PMID, FirstAuth, LastAuth, Authors, DOI
-    ##Convert to df w/list and zip
-     pubinfo_doi_df = pd.DataFrame(list(zip(pmid_df_list,first_auth,last_auth,auth_name_set,doi_url)),columns=['PMID','FirstAuthor (Lastname,Forename)','LastAuthor (Lastname,Forename)','Authors (Lastname,Forename)','DOI_link'])
-    ##-----------------------------------------------------------------------##
+            st.session_state["password_correct"] = False
+
+    if "password_correct" not in st.session_state:
+        # First run, show input for password.
+        st.text_input(
+            "Password", type="password", on_change=password_entered, key="password"
+        )
+        return False
+    elif not st.session_state["password_correct"]:
+        # Password not correct, show input + error.
+        st.text_input(
+            "Password", type="password", on_change=password_entered, key="password"
+        )
+        st.error("😕 Password incorrect")
+        return False
+    else:
+        # Password correct.
+        return True
+
+
+if check_password():
+
+##----------------Application Title----------------##
+# Add Title for Streamlit App
+    st.title('Author Count Tool')
+
+
+##----------------Work Instructions Tool Overview and Process Steps----------------##
+    st.markdown("The author count tool provides an author list with frequency of that author for a particular topic. The topic is selected in collecting the data (eg, pubmed search). The tool will replace special characters automatically. Follow these instructions to create your author list.")
+    st.markdown("""
+    1. Download data from a PubMed search in **CSV** format (Ensure your search is specific enough to achieve the desired list – ie consider using only clinical trial publications to identify clinician scientists)
+    2. Prepare your excel spreadsheet by labeling the first cell of the columns which includes your author data as AUTHOR (**ensure all caps**)
+        - If using PubMed2XL data for the author list, be sure to Find/Replace “||” with “, “ before saving (**ensure space is included in replace**)
+    3. Save your file as a CSV
+    4. Pubmed CSV files will have author last name and first initial – if you would like to get the full author names, use PubMed2xl to collect detailed information and use that as your source data
+    5. Examine results before downloading to confirm
+    6. Download your Author List!
+    """)
+
+##----------------Input File Uploader Widget----------------##
+# File Uploader Widget with specified .csv file type or returns error statement
+    st.subheader("Select a CSV file")
+    uploaded_file = st.file_uploader("Choose a .csv file", type = [".csv"])
+
+##----------------Input File Uploader Widget and Input Data Preview----------------##
+# Checks to ensure a file is uploaded, then run app
+    if uploaded_file is not None:
+        # Creates dataframe with "file-like" object as input
+        df = pd.read_csv(uploaded_file)
+
+        # Checkbox to allow user to show/hide preview of input dataframe
+        st.subheader("Review Input data (Optional)")
+        preview = st.checkbox('Show input data')
+        preview_placeholder = st.empty()
+
+        if preview:
+            with preview_placeholder.container():
+                st.subheader('Input data')
+                st.write(df) #main df full input data
+                st.stop() #Box checked: stops run
+        else:
+            preview_placeholder.empty() #Box unchecked: continues to run and no dataframe shown
+        
+        #UI message to show tool is runninga
+        placeholder=st.empty()
+        placeholder.text("Generating Author Count and DOI List. Please wait...")
+
+
+##----------------Webscrape Using PMID Input and Output to Parameter Lists----------------##
+    # Get PMID list for webscrape
+        pmidlist=df['PMID'].to_list()
+
+        # Webscrape with Pubmed Parser for Names, Affiliations and DOI
+        #completed_date_list = []
+        lastname_list=[]
+        forename_list = []
+        affiliations_list =[]
+        doi_url=[]
+
+
+        for item in pmidlist:
+            #PubmedParserforAuthorInfo
+            efetch = "http://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?&db=pubmed&retmode=xml&id=%s" % (item)
+            handle = urlopen(efetch)
+            data = handle.read()
+            root = ET.fromstring(data)
+            for article in root.findall("PubmedArticle"):
+                author_list = article.findall("MedlineCitation/Article/AuthorList/Author") #embedded fn,ln affiliation innfo-affiliation
+                doi_authorlastname_set =[]
+                doi_authorfirstname_set =[]
+                for auth in author_list:
+                    # Author Lastname
+                    auth_lastname = auth.findall('LastName')
+                    for lastname in auth_lastname:
+                        lastname_list.append(lastname.text) 
+                        doi_authorlastname_set.append(lastname.text)
+                    # Author Forename
+                    auth_forename = auth.findall('ForeName')
+                    for forename in auth_forename:
+                        forename_list.append(forename.text)
+                        doi_authorfirstname_set.append(forename.text)
+                    ##Author affiliations
+                    affiliations_info = auth.findall('AffiliationInfo')
+                    affils_return = len(affiliations_info) #if >1 affiliation listed
+                    af_set=[] #list for all affiliations if >1
+                    for i in affiliations_info:
+                        if affils_return == 1:
+                            affil = i.findall('Affiliation')
+                            for x in affil:
+                                af_set.append(x.text)
+                                #print(x.text) #append if one affiliation only to list
+                        elif affils_return >1:
+                            affil_set = i.findall('Affiliation')
+                            for y in affil_set:
+                                af_set.append(y.text)
+                        elif affils_return == 0:
+                            pass
+                    affiliations_list.append(af_set)
+
+        # Author list, full names
+        full_auth_name =list(map(' '.join, itertools.zip_longest(forename_list, lastname_list)))
+
+        # Affilations list with null items removed
+        full_affiliations_list = [xrs for xrs in affiliations_list if xrs != []]
+
+        # Affiliations filter to pull email information
+        email_regex = r"[a-zA-Z0-9\.\-+_]+@[a-zA-Z0-9\.\-+_]+\.[a-zA-Z]+"
+        emails=[]    
+        for affiliation in full_affiliations_list:
+            email_set=[]
+            for affil_email in affiliation:
+                if re.search(email_regex,affil_email):
+                    email_affil = re.findall(email_regex,affil_email)
+                    email_affil_str = str(email_affil) #str value
+                    email_affil_str = email_affil_str.replace('[','') #remove brackets and '
+                    email_affil_str = email_affil_str.replace(']','')
+                    email_affil_str =email_affil_str.replace ("'",'')
+                    email_set.append(email_affil_str)
+                elif 'Email address:' in affil_email:
+                    emailaddress_split = affil_email.split(':')[1]
+                    print(emailaddress_split)
+                    email_set.append(emailaddress_split)
+                elif 'Electronic address:' in affil_email:
+                    email_split = affil_email.split(':')[1]
+                    #print(email_split)
+                    email_set.append(email_split)
+                else:
+                    email_set.append('')
+            emails.append(email_set)
+
+
+#----------------Author Count and Affiliations DataFrame for CSV output----------------##
+        #Main df contains all info from webscraoe lists for Author, Affil and Email
+        df_main = pd.DataFrame(list(zip(full_auth_name,full_affiliations_list,emails)), columns=['Author (Forename, Lastname)','Affiliation',"Email"])
+        # Create map to add Publication Count column to main df
+        df_main['Publication Count'] = df_main["Author (Forename, Lastname)"].map(df_main["Author (Forename, Lastname)"].value_counts())
+        #Filter main df for unique auth so auth name only appears once
+        df_main_unique = df_main.drop_duplicates(subset=['Author (Forename, Lastname)'])
+        #Sort main unique df by Count from highest to lowest count
+        # Output df for csv file
+        final_sorted_df = df_main_unique.sort_values(by=['Publication Count'],ascending=False)
+        st.write(final_sorted_df)
+
+##----------------Preview Output Publication Count Table, Downloadable Files for Publication Count and DOI tables------------------------##  
     # Checkbox to allow user to show/hide preview of Author Count
-     placeholder.empty()
-     st.subheader("Preview Author Count (Optional)") 
-     if st.checkbox('Preview Author Count data'):
-        st.subheader('Author Count data')
-        st.write(df)
-     # Convert Author Count df to csv file
-     csv = convert_df(df)
-     # File Download Widget for AuthorCount.csv to Downloads folder
-     st.subheader("Download Author Count File") 
-     ste.download_button(
-     label="Download AuthorCount.csv",
-     data=csv,
-     file_name='AuthorCount.csv',
-     mime='text/csv')
-    # File Download Widget for PMID_DOI.csv to Downloads folder
-     st.subheader("Download Author Information and Link File") 
-     csv_doi = convert_df(pubinfo_doi_df)
-     ste.download_button(
-     label="Download AuthorInfoandLink.csv",
-     data=csv_doi,
-     file_name='AuthorInfoandLink.csv',
-     mime='text/csv')
+        placeholder.empty()
+        st.subheader("Preview Author Count and Affiliations (Optional)") 
+        if st.checkbox('Preview Author Count and Affiliations data'):
+            st.subheader('Author Count and Affiliations data')
+            st.write(final_sorted_df)
+        # Convert Author Count df to csv file
+        csv = convert_df(final_sorted_df)
+        # File Download Widget for AuthorCount.csv to Downloads folder
+        st.subheader("Download Author Count and Affiliations File") 
+        ste.download_button(
+        label="Download AuthorCountandAffiliations.csv",
+        data=csv,
+        file_name='AuthorCountandAffiliations.csv',
+        mime='text/csv')
