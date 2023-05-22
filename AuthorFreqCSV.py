@@ -169,7 +169,7 @@ if check_password():
                     email_set.append(email_affil_str)
                 elif 'Email address:' in affil_email:
                     emailaddress_split = affil_email.split(':')[1]
-                    print(emailaddress_split)
+                    #print(emailaddress_split)
                     email_set.append(emailaddress_split)
                 elif 'Electronic address:' in affil_email:
                     email_split = affil_email.split(':')[1]
@@ -190,7 +190,9 @@ if check_password():
         #Sort main unique df by Count from highest to lowest count
         # Output df for csv file
         final_sorted_df = df_main_unique.sort_values(by=['Publication Count'],ascending=False)
-        st.write(final_sorted_df)
+        final_sorted_df['Author (Forename, Lastname)'] = final_sorted_df['Author (Forename, Lastname)'].apply(unidecode)
+        
+        #st.write(final_sorted_df)
 
 ##----------------Preview Output Publication Count Table, Downloadable Files for Publication Count and DOI tables------------------------##  
     # Checkbox to allow user to show/hide preview of Author Count
