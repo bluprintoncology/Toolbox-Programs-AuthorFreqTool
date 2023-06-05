@@ -60,12 +60,10 @@ if check_password():
     st.markdown("The author count tool provides an author list with frequency of that author for a particular topic. The topic is selected in collecting the data (eg, pubmed search). The tool will replace special characters automatically. Follow these instructions to create your author list.")
     st.markdown("""
     1. Download data from a PubMed search in **CSV** format (Ensure your search is specific enough to achieve the desired list – ie consider using only clinical trial publications to identify clinician scientists)
-    2. Prepare your excel spreadsheet by labeling the first cell of the columns which includes your author data as AUTHOR (**ensure all caps**)
-        - If using PubMed2XL data for the author list, be sure to Find/Replace “||” with “, “ before saving (**ensure space is included in replace**)
+    2. Ensure that your spreadsheet has **PMID** at the top of the column for this variable (**ensure all caps – this should be standard in pubmed files**)
     3. Save your file as a CSV
-    4. Pubmed CSV files will have author last name and first initial – if you would like to get the full author names, use PubMed2xl to collect detailed information and use that as your source data
-    5. Examine results before downloading to confirm
-    6. Download your Author List!
+    4. Drag and drop your CSV file into the designated space
+    5. Download your Author List!
     """)
 
 ##----------------Input File Uploader Widget----------------##
@@ -79,18 +77,18 @@ if check_password():
         # Creates dataframe with "file-like" object as input
         df = pd.read_csv(uploaded_file)
 
-        # Checkbox to allow user to show/hide preview of input dataframe
-        st.subheader("Review Input data (Optional)")
-        preview = st.checkbox('Show input data')
-        preview_placeholder = st.empty()
+        # # Checkbox to allow user to show/hide preview of input dataframe
+        # st.subheader("Review Input data (Optional)")
+        # preview = st.checkbox('Show input data')
+        # preview_placeholder = st.empty()
 
-        if preview:
-            with preview_placeholder.container():
-                st.subheader('Input data')
-                st.write(df) #main df full input data
-                st.stop() #Box checked: stops run
-        else:
-            preview_placeholder.empty() #Box unchecked: continues to run and no dataframe shown
+        # if preview:
+        #     with preview_placeholder.container():
+        #         st.subheader('Input data')
+        #         st.write(df) #main df full input data
+        #         st.stop() #Box checked: stops run
+        # else:
+        #     preview_placeholder.empty() #Box unchecked: continues to run and no dataframe shown
         
         #UI message to show tool is runninga
         placeholder=st.empty()
@@ -148,6 +146,8 @@ if check_password():
                             pass
                     affiliations_list.append(af_set)
 
+        # print(affiliations_list)
+
         # Author list, full names
         full_auth_name =list(map(' '.join, itertools.zip_longest(forename_list, lastname_list)))
 
@@ -179,10 +179,58 @@ if check_password():
                     email_set.append('')
             emails.append(email_set)
 
+        
+        
+        # list of emails (nested)
+        # print(emails)
+        # # list of authorfullnames (not nested)        
+        # print(full_auth_name)
+
+        #Drop the @onwards from emails
+        sublist_emails=[]
+        for sublist in emails:
+            for item in sublist:
+                subitem_email = item.split('@')[0].lower() #alone = returns less#removes the @ and after email info for just first part to match wih anything in ln
+                subitem_nodot = subitem_email.replace('.','')
+                subitem_uscore = subitem_nodot.replace('_','')
+                subitem = subitem_uscore.replace('-','')
+                sublist_emails.append(subitem)
+        #print(sublist_emails)
+        #set fullname list to all lower case, no spaces
+        fn_lower_nospace = [item.replace(' ','').lower() for item in full_auth_name]
+        fn_lower=[item.replace('-','') for item in fn_lower_nospace]
+        # print(fn_lower)
+
+        tester1 = [l1 for l1 in sublist_emails if any([l2 in l1 for l2 in fn_lower])]
+        # # print(tester1)
+
+        shortened_lnlist=[x.lower() for x in lastname_list]
+        tester3 = [l1 for l1 in sublist_emails if any([l2 in l1 for l2 in shortened_lnlist])]
+        # print(tester3) #prints best match emails vs surname of author
+
+        filtered_list=[]
+        for sublist in emails:
+            subfiltered_list=[]
+            for item in sublist:
+                #print(item) #email
+                subitem_email = item.split('@')[0].lower() #alone = returns less#removes the @ and after email info for just first part to match wih anything in ln
+                subitem_nodot = subitem_email.replace('.','')
+                subitem_uscore = subitem_nodot.replace('_','')
+                subitem = subitem_uscore.replace('-','')
+                if subitem in tester3 or subitem in tester1:
+                    subfiltered_list.extend([item])
+                else:
+                    subfiltered_list.extend([''])
+            filtered_list.append(subfiltered_list)
+
+        # print(filtered_list)
+
+
 
 #----------------Author Count and Affiliations DataFrame for CSV output----------------##
         #Main df contains all info from webscraoe lists for Author, Affil and Email
-        df_main = pd.DataFrame(list(zip(full_auth_name,full_affiliations_list,emails)), columns=['Author (Forename, Lastname)','Affiliation',"Email"])
+        df_main = pd.DataFrame(list(zip(full_auth_name,full_affiliations_list,filtered_list,emails)), columns=['Author (Forename, Lastname)','Affiliation','FilteredEmails',"Email"])
+
         # Create map to add Publication Count column to main df
         df_main['Publication Count'] = df_main["Author (Forename, Lastname)"].map(df_main["Author (Forename, Lastname)"].value_counts())
         #Filter main df for unique auth so auth name only appears once
@@ -192,15 +240,15 @@ if check_password():
         final_sorted_df = df_main_unique.sort_values(by=['Publication Count'],ascending=False)
         final_sorted_df['Author (Forename, Lastname)'] = final_sorted_df['Author (Forename, Lastname)'].apply(unidecode)
         
-        #st.write(final_sorted_df)
+#         #st.write(final_sorted_df)
 
-##----------------Preview Output Publication Count Table, Downloadable Files for Publication Count and DOI tables------------------------##  
-    # Checkbox to allow user to show/hide preview of Author Count
+# ##----------------Preview Output Publication Count Table, Downloadable Files for Publication Count and DOI tables------------------------##  
+    # # Checkbox to allow user to show/hide preview of Author Count
         placeholder.empty()
-        st.subheader("Preview Author Count and Affiliations (Optional)") 
-        if st.checkbox('Preview Author Count and Affiliations data'):
-            st.subheader('Author Count and Affiliations data')
-            st.write(final_sorted_df)
+    #     st.subheader("Preview Author Count and Affiliations (Optional)") 
+    #     if st.checkbox('Preview Author Count and Affiliations data'):
+    #         st.subheader('Author Count and Affiliations data')
+    #         st.write(final_sorted_df)
         # Convert Author Count df to csv file
         csv = convert_df(final_sorted_df)
         # File Download Widget for AuthorCount.csv to Downloads folder
