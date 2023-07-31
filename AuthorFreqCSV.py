@@ -149,7 +149,7 @@ if check_password():
         # print(affiliations_list)
 
         # Author list, full names
-        full_auth_name =list(map(' '.join, itertools.zip_longest(forename_list, lastname_list)))
+        full_auth_name =list(map(' '.join, itertools.zip_longest(forename_list, lastname_list,fillvalue = "empty")))
 
         # Affilations list with null items removed
         full_affiliations_list = [xrs for xrs in affiliations_list if xrs != []]
